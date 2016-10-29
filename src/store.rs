@@ -19,7 +19,7 @@ impl<T, M> Store<T, M> where T: State, M: Middleware<T> {
         let next = |action: T::Action| {
             self.state.lock().unwrap().reduce(action);
         };
-        self.middleware.lock().unwrap().dispatch(next, action);
+        self.middleware.lock().unwrap().dispatch(&next, action);
     }
 
     pub fn state(&self) -> MutexGuard<T> {

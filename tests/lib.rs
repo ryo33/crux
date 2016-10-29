@@ -30,7 +30,7 @@ struct TestMiddleware {
 }
 
 impl<T> Middleware<T> for TestMiddleware where T: State {
-    fn dispatch<N>(&mut self, next: N, action: T::Action) where N: Fn(T::Action) {
+    fn dispatch(&mut self, next: &Fn(T::Action), action: T::Action) {
         self.counter += 1;
         println!("{}", self.counter);
         next(action);
