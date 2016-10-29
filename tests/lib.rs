@@ -1,9 +1,9 @@
 extern crate rstate;
 use std::time::Duration;
 use std::thread;
-use rstate::state::State;
-use rstate::store::Store;
-use rstate::middleware::Middleware;
+use rstate::State;
+use rstate::Store;
+use rstate::Middleware;
 
 enum TestAction {
     Increment,
@@ -36,7 +36,7 @@ impl Middleware<TestState> for TestMiddleware {
         let mut store_mut = store.clone();
         let counter = self.counter;
         match action {
-            TestAction::Add(x) => (),
+            TestAction::Add(_) => (),
             _ => {
                 thread::spawn(move || {
                     thread::sleep(Duration::from_millis(5));
