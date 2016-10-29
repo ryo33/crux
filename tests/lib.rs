@@ -1,4 +1,6 @@
 extern crate rstate;
+use std::time::Duration;
+use std::thread;
 use rstate::state::State;
 use rstate::store::Store;
 use rstate::middleware::Middleware;
@@ -29,10 +31,23 @@ struct TestMiddleware {
     pub counter: i32,
 }
 
-impl<T> Middleware<T> for TestMiddleware where T: State {
-    fn dispatch(&mut self, next: &Fn(T::Action), action: T::Action) {
+impl Middleware<TestState> for TestMiddleware {
+    fn dispatch(&mut self, store: Store<TestState, Self>, next: &Fn(TestAction), action: TestAction) {
+        let mut store_mut = store.clone();
+        let counter = self.counter;
+        match action {
+            TestAction::Add(x) => (),
+            _ => {
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_millis(5));
+                    let number = store_mut.state().number;
+                    thread::sleep(Duration::from_millis(15));
+                    let next_number = store_mut.state().number;
+                    store_mut.dispatch(TestAction::Add(next_number - number + counter));
+                });
+            }
+        }
         self.counter += 1;
-        println!("{}", self.counter);
         next(action);
     }
 }
@@ -46,17 +61,37 @@ fn store() {
         counter: 0,
     };
     let mut store = Store::new(state, middleware);
+
     {
         let current_state = store.state();
         assert_eq!(current_state.number, 0);
     }
 
     store.dispatch(TestAction::Increment);
+    // counter = 0
     assert_eq!(store.state().number, 1);
 
+    thread::sleep(Duration::from_millis(10));
+
     store.dispatch(TestAction::Add(2));
+    // counter = 1
     assert_eq!(store.state().number, 3);
 
+    thread::sleep(Duration::from_millis(15));
+    // counter = 2
+    assert_eq!(store.state().number, 3 + (3 - 1) + 0); // 5
+    // counter = 3
+    thread::sleep(Duration::from_millis(15));
+    // counter = 4
+    assert_eq!(store.state().number, 5);
+
     store.dispatch(TestAction::Decrement);
+    // counter = 5
+    assert_eq!(store.state().number, 4);
+    store.dispatch(TestAction::Add(-2));
+    // counter = 6
     assert_eq!(store.state().number, 2);
+
+    thread::sleep(Duration::from_millis(25));
+    assert_eq!(store.state().number, 2 + (2 - 4) + 5);
 }
