@@ -1,36 +1,52 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::slice::IterMut;
 use state::State;
 use middleware::Middleware;
 
-pub struct Store<T, M> {
-    state: Arc<Mutex<T>>,
-    middleware: Arc<Mutex<M>>,
+type ArcRwLockMiddleware<T> = Arc<RwLock<Middleware<T> + Send + Sync + 'static>>;
+
+#[derive(Clone)]
+pub struct Store<T> where T: State + Clone {
+    state: Arc<RwLock<T>>,
+    middlewares: Vec<ArcRwLockMiddleware<T>>,
 }
 
-impl <T, M> Store<T, M> where T: State, M: Middleware<T> {
-    pub fn new(state: T, middleware: M) -> Self {
+impl <T> Store<T> where T: State + Clone {
+    pub fn new(state: T) -> Self {
         Store {
-            state: Arc::new(Mutex::new(state)),
-            middleware: Arc::new(Mutex::new(middleware)),
+            state: Arc::new(RwLock::new(state)),
+            middlewares: Vec::new(),
         }
     }
 
-    pub fn clone(&self) -> Self {
-        Store {
-            state: self.state.clone(),
-            middleware: self.middleware.clone(),
-        }
+    pub fn add_middleware<M>(&mut self, middleware: M)
+        where M: Middleware<T> + Send + Sync + 'static {
+        self.middlewares.push(Arc::new(RwLock::new(middleware)));
+    }
+
+    pub fn state(&self) -> RwLockReadGuard<T> {
+        self.state.read().unwrap()
     }
 
     pub fn dispatch(&mut self, action: T::Action) {
-        let store = self.clone();
-        let next = |action: T::Action| {
-            self.state.lock().unwrap().reduce(action);
-        };
-        self.middleware.lock().unwrap().dispatch(store, &next, action);
+        let mut middlewares = self.middlewares.clone();
+        let mut iter = middlewares.iter_mut();
+        self.dispatch_middleware(&mut iter, action);
     }
 
-    pub fn state(&self) -> MutexGuard<T> {
-        self.state.lock().unwrap()
+    fn dispatch_middleware(&mut self, iter: &mut IterMut<ArcRwLockMiddleware<T>>, action: T::Action) {
+        match iter.next() {
+            Some(middleware) => {
+                let store = self.clone();
+                let mut next = |action: T::Action| {
+                    self.dispatch_middleware(iter, action);
+                };
+                middleware.write().unwrap().dispatch(store, &mut next, action);
+            },
+            _ => {
+                self.state.write().unwrap().reduce(action);
+            }
+        }
     }
 }
+

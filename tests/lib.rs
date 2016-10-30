@@ -5,6 +5,7 @@ use rstate::State;
 use rstate::Store;
 use rstate::Middleware;
 
+#[derive(Debug, Copy, Clone)]
 enum TestAction {
     Add(i32),
     Increment,
@@ -12,6 +13,7 @@ enum TestAction {
     BonusTime, // 20ms Bonus Time
 }
 
+#[derive(Debug, Clone)]
 struct TestState {
     pub number: i32,
 }
@@ -34,13 +36,13 @@ struct TestMiddleware {
 }
 
 impl Middleware<TestState> for TestMiddleware {
-    fn dispatch(&mut self, store: Store<TestState, Self>, next: &Fn(TestAction), action: TestAction) {
+    fn dispatch(&mut self, store: Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
         match action {
             TestAction::BonusTime => {
                 self.counter += 1;
 
-                let mut store_mut = store.clone();
                 let counter = self.counter;
+                let mut store_mut = store.clone();
 
                 thread::spawn(move || {
                     let number = store_mut.state().number;
@@ -50,6 +52,7 @@ impl Middleware<TestState> for TestMiddleware {
                     store_mut.dispatch(TestAction::Add(bonus));
                 });
                 thread::sleep(Duration::from_millis(1));
+                next(action);
             },
             _ => {
                 next(action);
@@ -58,15 +61,30 @@ impl Middleware<TestState> for TestMiddleware {
     }
 }
 
+struct Logger;
+impl Middleware<TestState> for Logger {
+    fn dispatch(&mut self, _store: Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
+        // println!("previous state: {:?}", store.state());
+        next(action);
+        println!("action: {:?}", action);
+        // println!("next state: {:?}", store.state());
+    }
+}
+
 #[test]
 fn store() {
     let state = TestState {
         number: 0,
     };
+    let mut store = Store::new(state);
+
+    let logger = Logger;
     let middleware = TestMiddleware {
         counter: 0,
     };
-    let mut store = Store::new(state, middleware);
+
+    store.add_middleware(middleware);
+    store.add_middleware(logger);
 
     assert_eq!(store.state().number, 0);
 
