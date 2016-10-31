@@ -19,8 +19,8 @@ impl <T> Store<T> where T: State + Clone {
         }
     }
 
-    pub fn add_middleware<M>(&mut self, middleware: M)
-        where M: Middleware<T> + Send + Sync + 'static {
+    pub fn add_middleware<M>(&mut self, middleware: M) where
+        M: Middleware<T> + Send + Sync + 'static {
         self.middlewares.push(Arc::new(RwLock::new(middleware)));
     }
 
@@ -41,7 +41,7 @@ impl <T> Store<T> where T: State + Clone {
                 let mut next = |action: T::Action| {
                     self.dispatch_middleware(iter, action);
                 };
-                middleware.write().unwrap().dispatch(store, &mut next, action);
+                middleware.write().unwrap().dispatch(&store, &mut next, action);
             },
             _ => {
                 self.state.write().unwrap().reduce(action);

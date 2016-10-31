@@ -2,3 +2,7 @@
 name = "crux"
 version = "0.1.0"
 authors = ["Ryo Hashiguchi <ryo12redstone@gmail.com>"]
+
+[dev-dependencies]
+log = "*"
+env_logger = "*"
