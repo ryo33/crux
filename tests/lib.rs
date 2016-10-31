@@ -1,9 +1,9 @@
-extern crate rstate;
+extern crate crux;
 use std::time::Duration;
 use std::thread;
-use rstate::State;
-use rstate::Store;
-use rstate::Middleware;
+use crux::State;
+use crux::Store;
+use crux::Middleware;
 
 #[derive(Debug, Copy, Clone)]
 enum TestAction {
