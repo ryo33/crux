@@ -1,14 +1,8 @@
 extern crate crux;
-#[macro_use]
-extern crate log;
-extern crate env_logger;
 
-use std::fmt::Debug;
 use std::time::Duration;
 use std::thread;
-use crux::State;
-use crux::Store;
-use crux::Middleware;
+use crux::{State, Store, Middleware};
 
 #[derive(Debug, Copy, Clone)]
 enum TestAction {
@@ -34,12 +28,6 @@ impl State for TestState {
             TestAction::Decrement => self.number -= 1,
             _ => {},
         }
-    }
-}
-
-impl Log for TestState {
-    fn log(&self) -> String {
-        format!("{:?}", self)
     }
 }
 
@@ -79,26 +67,8 @@ impl Middleware<TestState> for AssertMiddleware {
     }
 }
 
-trait Log {
-    fn log(&self) -> String;
-}
-
-struct Logger;
-impl <T> Middleware<T> for Logger where
-    T: State + Log + Clone,
-    T::Action: Debug + Copy {
-    fn dispatch(&mut self, store: &Store<T>, next: &mut FnMut(T::Action), action: T::Action) {
-        debug!("previous state: {}", store.state().log());
-        next(action);
-        debug!("action: {:?}", action);
-        debug!("next state: {}", store.state().log());
-    }
-}
-
 #[test]
 fn store() {
-    env_logger::init().unwrap();
-
     let state = TestState {
         number: 0,
     };
@@ -107,10 +77,9 @@ fn store() {
     let bonus_time_middleware = BonusTimeMiddleware {
         counter: 0,
     };
-    let logger = Logger;
     let assert_middleware = AssertMiddleware;
+
     store.add_middleware(bonus_time_middleware);
-    store.add_middleware(logger);
     store.add_middleware(assert_middleware);
 
     store.dispatch(TestAction::AssertEq(0));

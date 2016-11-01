@@ -2,7 +2,8 @@
 name = "crux"
 version = "0.1.0"
 authors = ["Ryo Hashiguchi <ryo12redstone@gmail.com>"]
-
-[dev-dependencies]
-log = "*"
-env_logger = "*"
+description = "A state container"
+repository = "https://github.com/ryo33/crux"
+readme = "README.md"
+keywords = ["state"]
+license = "MIT"

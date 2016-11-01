@@ -10,8 +10,6 @@ I plan to use this with [Piston](http://www.piston.rs/).
 
 ```bash
 $ cargo test
-$ # or
-$ RUST_LOG=lib=debug cargo test
 ```
 
 ## License
