@@ -22,11 +22,8 @@ impl State for TestState {
     type Action = TestAction;
 
     fn reduce(&mut self, action: TestAction) {
-        match action {
-            TestAction::Add(x) => self.number += x,
-            TestAction::Increment => self.number += 1,
-            TestAction::Decrement => self.number -= 1,
-            _ => {},
+        if let TestAction::Add(x) = action {
+            self.number += x;
         }
     }
 }
@@ -36,13 +33,12 @@ struct BonusTimeMiddleware {
 }
 
 impl Middleware<TestState> for BonusTimeMiddleware {
-    fn dispatch(&mut self, store: &Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
+    fn dispatch(&mut self, store: &mut Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
         if let TestAction::BonusTime = action {
             self.counter += 1;
 
             let counter = self.counter;
             let mut store_mut = store.clone();
-
             thread::spawn(move || {
                 let number = store_mut.state().number;
                 thread::sleep(Duration::from_millis(20));
@@ -56,10 +52,26 @@ impl Middleware<TestState> for BonusTimeMiddleware {
     }
 }
 
+struct ReplaceMiddleware;
+
+impl Middleware<TestState> for ReplaceMiddleware {
+    fn dispatch(&mut self, store: &mut Store<TestState>, _next: &mut FnMut(TestAction), action: TestAction) {
+        match action {
+            TestAction::Increment => {
+                store.dispatch(TestAction::Add(1));
+            },
+            TestAction::Decrement => {
+                store.dispatch(TestAction::Add(-1));
+            },
+            _ => {},
+        }
+    }
+}
+
 struct AssertMiddleware;
 
 impl Middleware<TestState> for AssertMiddleware {
-    fn dispatch(&mut self, store: &Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
+    fn dispatch(&mut self, store: &mut Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
         if let TestAction::AssertEq(number) = action {
             assert_eq!(store.state().number, number);
         }
@@ -77,9 +89,11 @@ fn store() {
     let bonus_time_middleware = BonusTimeMiddleware {
         counter: 0,
     };
+    let replace_middleware = ReplaceMiddleware;
     let assert_middleware = AssertMiddleware;
 
     store.add_middleware(bonus_time_middleware);
+    store.add_middleware(replace_middleware);
     store.add_middleware(assert_middleware);
 
     store.dispatch(TestAction::AssertEq(0));
