@@ -55,7 +55,7 @@ impl Middleware<TestState> for BonusTimeMiddleware {
 struct ReplaceMiddleware;
 
 impl Middleware<TestState> for ReplaceMiddleware {
-    fn dispatch(&mut self, store: &mut Store<TestState>, _next: &mut FnMut(TestAction), action: TestAction) {
+    fn dispatch(&mut self, store: &mut Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
         match action {
             TestAction::Increment => {
                 store.dispatch(TestAction::Add(1));
@@ -63,7 +63,9 @@ impl Middleware<TestState> for ReplaceMiddleware {
             TestAction::Decrement => {
                 store.dispatch(TestAction::Add(-1));
             },
-            _ => {},
+            _ => {
+                next(action);
+            },
         }
     }
 }
@@ -80,7 +82,7 @@ impl Middleware<TestState> for AssertMiddleware {
 }
 
 #[test]
-fn store() {
+fn example() {
     let state = TestState {
         number: 0,
     };
@@ -99,6 +101,7 @@ fn store() {
     store.dispatch(TestAction::AssertEq(0));
 
     store.dispatch(TestAction::Increment);
+    thread::sleep(Duration::from_millis(1));
     store.dispatch(TestAction::AssertEq(1));
 
     store.dispatch(TestAction::Add(2));
@@ -111,6 +114,7 @@ fn store() {
     store.dispatch(TestAction::AssertEq(6));
 
     store.dispatch(TestAction::Decrement);
+    thread::sleep(Duration::from_millis(1));
     store.dispatch(TestAction::AssertEq(5));
 
     // finish BonusTime 1
@@ -124,9 +128,12 @@ fn store() {
     store.dispatch(TestAction::AssertEq(3));
 
     store.dispatch(TestAction::Increment);
+    thread::sleep(Duration::from_millis(1));
     store.dispatch(TestAction::AssertEq(4));
 
     // finish BonusTime 2
     thread::sleep(Duration::from_millis(25));
     store.dispatch(TestAction::AssertEq(4 + (4 - 7) * 2)); // -2
+
+    assert_eq!(store.state().number, -2);
 }
