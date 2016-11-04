@@ -99,12 +99,12 @@ fn example() {
     store.add_middleware(assert_middleware);
 
     store.dispatch(TestAction::AssertEq(0));
-
-    store.dispatch(TestAction::Increment);
-    thread::sleep(Duration::from_millis(1));
-    store.dispatch(TestAction::AssertEq(1));
+    assert_eq!(store.state().number, 0);
 
     store.dispatch(TestAction::Add(2));
+    store.dispatch(TestAction::AssertEq(2));
+
+    store.dispatch(TestAction::Increment);
     store.dispatch(TestAction::AssertEq(3));
 
     // start BonusTime 1
@@ -114,7 +114,6 @@ fn example() {
     store.dispatch(TestAction::AssertEq(6));
 
     store.dispatch(TestAction::Decrement);
-    thread::sleep(Duration::from_millis(1));
     store.dispatch(TestAction::AssertEq(5));
 
     // finish BonusTime 1
@@ -124,11 +123,10 @@ fn example() {
     // start BonusTime 2
     store.dispatch(TestAction::BonusTime);
 
-    store.dispatch(TestAction::Add(-4));
-    store.dispatch(TestAction::AssertEq(3));
-
     store.dispatch(TestAction::Increment);
-    thread::sleep(Duration::from_millis(1));
+    store.dispatch(TestAction::AssertEq(8));
+
+    store.dispatch(TestAction::Add(-4));
     store.dispatch(TestAction::AssertEq(4));
 
     // finish BonusTime 2
