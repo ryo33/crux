@@ -10,7 +10,6 @@ enum TestAction {
     Increment,
     Decrement,
     BonusTime, // 20ms Bonus Time
-    AssertEq(i32),
 }
 
 #[derive(Debug, Clone)]
@@ -70,19 +69,8 @@ impl Middleware<TestState> for ReplaceMiddleware {
     }
 }
 
-struct AssertMiddleware;
-
-impl Middleware<TestState> for AssertMiddleware {
-    fn dispatch(&mut self, store: &mut Store<TestState>, next: &mut FnMut(TestAction), action: TestAction) {
-        if let TestAction::AssertEq(number) = action {
-            assert_eq!(store.state().number, number);
-        }
-        next(action);
-    }
-}
-
 #[test]
-fn example() {
+fn example_sync() {
     let state = TestState {
         number: 0,
     };
@@ -92,46 +80,63 @@ fn example() {
         counter: 0,
     };
     let replace_middleware = ReplaceMiddleware;
-    let assert_middleware = AssertMiddleware;
 
     store.add_middleware(bonus_time_middleware);
     store.add_middleware(replace_middleware);
-    store.add_middleware(assert_middleware);
 
-    store.dispatch(TestAction::AssertEq(0));
     assert_eq!(store.state().number, 0);
 
-    store.dispatch(TestAction::Add(2));
-    store.dispatch(TestAction::AssertEq(2));
+    store.dispatch_sync(TestAction::Add(2));
+    assert_eq!(store.state().number, 2);
 
-    store.dispatch(TestAction::Increment);
-    store.dispatch(TestAction::AssertEq(3));
+    store.dispatch_sync(TestAction::Increment);
+    assert_eq!(store.state().number, 3);
 
     // start BonusTime 1
     store.dispatch(TestAction::BonusTime);
 
-    store.dispatch(TestAction::Add(3));
-    store.dispatch(TestAction::AssertEq(6));
+    store.dispatch_sync(TestAction::Add(3));
+    assert_eq!(store.state().number, 6);
 
-    store.dispatch(TestAction::Decrement);
-    store.dispatch(TestAction::AssertEq(5));
+    store.dispatch_sync(TestAction::Decrement);
+    assert_eq!(store.state().number, 5);
 
     // finish BonusTime 1
     thread::sleep(Duration::from_millis(25));
-    store.dispatch(TestAction::AssertEq(5 + (5 - 3) * 1)); // 7
+    assert_eq!(store.state().number, 5 + (5 - 3) * 1); // 7
 
     // start BonusTime 2
     store.dispatch(TestAction::BonusTime);
 
-    store.dispatch(TestAction::Increment);
-    store.dispatch(TestAction::AssertEq(8));
+    store.dispatch_sync(TestAction::Increment);
+    assert_eq!(store.state().number, 8);
 
-    store.dispatch(TestAction::Add(-4));
-    store.dispatch(TestAction::AssertEq(4));
+    store.dispatch_sync(TestAction::Add(-4));
+    assert_eq!(store.state().number, 4);
 
     // finish BonusTime 2
     thread::sleep(Duration::from_millis(25));
-    store.dispatch(TestAction::AssertEq(4 + (4 - 7) * 2)); // -2
+    assert_eq!(store.state().number, 4 + (4 - 7) * 2); // -2
+}
 
-    assert_eq!(store.state().number, -2);
+#[test]
+fn example_async() {
+    let state = TestState {
+        number: 0,
+    };
+    let mut store = Store::new(state);
+
+    let replace_middleware = ReplaceMiddleware;
+
+    store.add_middleware(replace_middleware);
+
+    assert_eq!(store.state().number, 0);
+
+    store.dispatch(TestAction::Increment);
+    thread::sleep(Duration::from_millis(25));
+    assert_eq!(store.state().number, 1);
+
+    store.dispatch(TestAction::Decrement);
+    thread::sleep(Duration::from_millis(25));
+    assert_eq!(store.state().number, 0);
 }

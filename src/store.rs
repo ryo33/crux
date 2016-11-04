@@ -14,7 +14,7 @@ pub struct Store<T> where T: State {
     state: Arc<RwLock<T>>,
     middlewares: Arc<RwLock<Vec<ArcMutexMiddleware<T>>>>,
     processing_actions: Arc<Mutex<i32>>,
-    dispatch_sender: SyncSender<T::Action>,
+    dispatch_sender: SyncSender<(T::Action, bool)>, // (action, sync)
     dispatch_receiver: Arc<Mutex<Receiver<()>>>,
 }
 
@@ -33,10 +33,19 @@ impl<T> Store<T> where
         };
         let mut store_mut = store.clone();
         thread::spawn(move || {
+            let mut sync = false;
             loop {
-                let action = receiver.recv().unwrap();
-                store_mut._dispatch(action);
-                sender.send(()).unwrap();
+                let (action, s) = receiver.recv().unwrap();
+                if s == true {
+                    sync = true;
+                }
+                store_mut.dispatch_(action);
+                let mut actions = store_mut.processing_actions.lock().unwrap();
+                *actions -= 1;
+                if sync && *actions == 0 {
+                    sender.send(()).unwrap();
+                    sync = false;
+                }
             }
         });
         store
@@ -52,18 +61,20 @@ impl<T> Store<T> where
     }
 
     pub fn dispatch(&mut self, action: T::Action) {
-        let from_middleware = *self.processing_actions.lock().unwrap() != 0;
-        *self.processing_actions.lock().unwrap() += 1;
-        self.dispatch_sender.send(action).unwrap();
-        if ! from_middleware {
-            while *self.processing_actions.lock().unwrap() != 0 {
-                self.dispatch_receiver.lock().unwrap().recv().unwrap();
-                *self.processing_actions.lock().unwrap() -= 1;
-            }
-        }
+        self.send_dispatch(action, false);
     }
 
-    pub fn _dispatch(&mut self, action: T::Action) {
+    pub fn dispatch_sync(&mut self, action: T::Action) {
+        self.send_dispatch(action, true);
+        self.dispatch_receiver.lock().unwrap().recv().unwrap();
+    }
+
+    fn send_dispatch(&mut self, action: T::Action, sync: bool) {
+        *self.processing_actions.lock().unwrap() += 1;
+        self.dispatch_sender.send((action, sync)).unwrap();
+    }
+
+    fn dispatch_(&mut self, action: T::Action) {
         let mut middlewares = self.middlewares.write().unwrap();
         let mut iter = middlewares.iter_mut();
         let mut store = self.clone();
