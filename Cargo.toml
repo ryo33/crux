@@ -1,6 +1,6 @@
 [package]
 name = "crux"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ryo Hashiguchi <ryo12redstone@gmail.com>"]
 description = "A state container"
 repository = "https://github.com/ryo33/crux"
