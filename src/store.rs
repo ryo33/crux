@@ -14,7 +14,7 @@ pub struct Store<T> where T: State {
     state: Arc<RwLock<T>>,
     middlewares: Arc<RwLock<Vec<ArcMutexMiddleware<T>>>>,
     processing_actions: Arc<Mutex<i32>>,
-    dispatch_sender: SyncSender<(T::Action, bool)>, // (action, sync)
+    dispatch_sender: Arc<Mutex<SyncSender<(T::Action, bool)>>>, // (action, is_sync)
     dispatch_receiver: Arc<Mutex<Receiver<()>>>,
 }
 
@@ -28,7 +28,7 @@ impl<T> Store<T> where
             state: Arc::new(RwLock::new(state)),
             middlewares: Arc::new(RwLock::new(Vec::new())),
             processing_actions: Arc::new(Mutex::new(0)),
-            dispatch_sender: dispatch_sender,
+            dispatch_sender: Arc::new(Mutex::new(dispatch_sender)),
             dispatch_receiver: Arc::new(Mutex::new(dispatch_receiver)),
         };
         let mut store_mut = store.clone();
@@ -71,7 +71,7 @@ impl<T> Store<T> where
 
     fn send_dispatch(&mut self, action: T::Action, sync: bool) {
         *self.processing_actions.lock().unwrap() += 1;
-        self.dispatch_sender.send((action, sync)).unwrap();
+        self.dispatch_sender.lock().unwrap().send((action, sync)).unwrap();
     }
 
     fn dispatch_(&mut self, action: T::Action) {
